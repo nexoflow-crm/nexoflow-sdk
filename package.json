@@ -1,0 +1,52 @@
+{
+  "name": "nexoflow-sdk",
+  "version": "0.1.0",
+  "description": "Official SDK for the NexoFlow Content API — fetch blog posts, pages, and images with full TypeScript support.",
+  "author": "NexoFlow <info@nexoflow.net> (https://nexoflow.net)",
+  "homepage": "https://nexoflow.net",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nexoflow/nexoflow-sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/nexoflow/nexoflow-sdk/issues"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "nexoflow",
+    "cms",
+    "headless",
+    "content-api",
+    "blog",
+    "seo",
+    "typescript"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
