@@ -6,10 +6,10 @@
   "homepage": "https://nexoflow.net",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nexoflow/nexoflow-sdk"
+    "url": "https://github.com/nexoflow-crm/nexoflow-sdk"
   },
   "bugs": {
-    "url": "https://github.com/nexoflow/nexoflow-sdk/issues"
+    "url": "https://github.com/nexoflow-crm/nexoflow-sdk/issues"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
