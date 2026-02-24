@@ -1,6 +1,6 @@
 {
   "name": "nexoflow-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Official SDK for the NexoFlow Content API — fetch blog posts, pages, and images with full TypeScript support.",
   "author": "NexoFlow <info@nexoflow.net> (https://nexoflow.net)",
   "homepage": "https://nexoflow.net",
