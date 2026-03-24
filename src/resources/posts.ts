@@ -1,4 +1,4 @@
-import type { HttpClient } from "../http"
+import type { HttpClient, ApiResponse } from "../http"
 import type {
   ListPostsParams,
   ListPostsResponse,
@@ -6,6 +6,7 @@ import type {
   GetPostResponse,
   PostListItem,
   Pagination,
+  RateLimitInfo,
 } from "../types"
 
 export class PostsResource {
@@ -15,10 +16,13 @@ export class PostsResource {
    * List published posts (paginated).
    *
    * ```ts
-   * const { posts, pagination } = await nf.posts.list({ limit: 10 })
+   * const { data, rateLimit } = await nf.posts.list({ limit: 10 })
+   * const { posts, pagination } = data
    * ```
    */
-  async list(params?: ListPostsParams): Promise<ListPostsResponse> {
+  async list(
+    params?: ListPostsParams,
+  ): Promise<ApiResponse<ListPostsResponse>> {
     return this.http.request<ListPostsResponse>({
       path: "/api/v1/content/posts",
       params: {
@@ -35,10 +39,13 @@ export class PostsResource {
    * Get a single post by slug with full content.
    *
    * ```ts
-   * const post = await nf.posts.get("my-post-slug")
+   * const { data: post } = await nf.posts.get("my-post-slug")
    * ```
    */
-  async get(slug: string, params?: GetPostParams): Promise<GetPostResponse> {
+  async get(
+    slug: string,
+    params?: GetPostParams,
+  ): Promise<ApiResponse<GetPostResponse>> {
     return this.http.request<GetPostResponse>({
       path: `/api/v1/content/posts/${encodeURIComponent(slug)}`,
       params: {
@@ -49,7 +56,7 @@ export class PostsResource {
   }
 
   /**
-   * Fetch ALL posts across all pages. Useful for static site generation.
+   * Fetch **all** posts across every page. Useful for static site generation.
    *
    * ```ts
    * const allPosts = await nf.posts.all()
@@ -61,9 +68,9 @@ export class PostsResource {
     let hasMore = true
 
     while (hasMore) {
-      const response = await this.list({ ...params, page, limit: 100 })
-      allPosts.push(...response.posts)
-      hasMore = response.pagination.hasMore
+      const { data } = await this.list({ ...params, page, limit: 100 })
+      allPosts.push(...data.posts)
+      hasMore = data.pagination.hasMore
       page++
     }
 
@@ -71,10 +78,9 @@ export class PostsResource {
   }
 
   /**
-   * Get all post slugs. Useful for Next.js generateStaticParams.
+   * Get all post slugs. Handy for Next.js `generateStaticParams`.
    *
    * ```ts
-   * // app/blog/[slug]/page.tsx
    * export async function generateStaticParams() {
    *   return await nf.posts.slugs()
    * }
@@ -83,5 +89,30 @@ export class PostsResource {
   async slugs(): Promise<Array<{ slug: string }>> {
     const posts = await this.all()
     return posts.map((p) => ({ slug: p.slug }))
+  }
+
+  /**
+   * Async iterator that yields one post-list item at a time across all pages.
+   *
+   * ```ts
+   * for await (const post of nf.posts.iter({ category: "news" })) {
+   *   console.log(post.title)
+   * }
+   * ```
+   */
+  async *iter(
+    params?: Omit<ListPostsParams, "page">,
+  ): AsyncGenerator<PostListItem, void, undefined> {
+    let page = 1
+    let hasMore = true
+
+    while (hasMore) {
+      const { data } = await this.list({ ...params, page, limit: 100 })
+      for (const post of data.posts) {
+        yield post
+      }
+      hasMore = data.pagination.hasMore
+      page++
+    }
   }
 }

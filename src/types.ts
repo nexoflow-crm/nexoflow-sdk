@@ -1,14 +1,55 @@
 // ── Client Configuration ────────────────────────────────────────────────────
 
 export interface NexoFlowConfig {
-  /** Your project API key (pk_live_…). Required. */
+  /**
+   * Your project API key (`pk_live_…`). **Required.**
+   *
+   * **WARNING — this key is SECRET.** Never expose it in browser-side code,
+   * HTML source, or client bundles. Always read it from an environment
+   * variable on the server:
+   *
+   * ```ts
+   * new NexoFlow({ apiKey: process.env.NEXOFLOW_API_KEY! })
+   * ```
+   */
   apiKey: string
-  /** Base URL of the NexoFlow instance. Defaults to https://nexoflow.net */
+
+  /** Base URL of the NexoFlow instance. Defaults to `"https://nexoflow.net"`. */
   baseUrl?: string
-  /** Default revalidate hint (seconds) for Next.js ISR caching. Defaults to 60. */
+
+  /** Default `next.revalidate` hint (seconds) for Next.js ISR caching. Defaults to `60`. */
   revalidate?: number | false
-  /** Request timeout in milliseconds. Defaults to 15000 (15s). */
+
+  /** Request timeout in milliseconds. Defaults to `15_000` (15 s). */
   timeout?: number
+
+  /**
+   * Custom `fetch` implementation. When omitted the SDK uses `globalThis.fetch`.
+   * Useful for polyfills, test doubles, or Cloudflare Workers bindings.
+   */
+  fetch?: typeof globalThis.fetch
+
+  /** Automatic retry policy for transient failures (network errors & 5xx). */
+  retry?: {
+    /** Maximum number of attempts (including the initial request). Defaults to `3`. */
+    attempts?: number
+    /** Base delay between retries in ms (doubles each attempt). Defaults to `500`. */
+    delay?: number
+  }
+
+  /**
+   * When `true` every request and response is logged to `console.debug`.
+   * Works in both Node.js and browser consoles.
+   */
+  debug?: boolean
+
+  /** Optional hooks for request/response inspection or mutation. */
+  hooks?: {
+    /** Called just before each fetch. You may mutate `req`. */
+    beforeRequest?: (req: { url: string; init: RequestInit }) => void | Promise<void>
+    /** Called after each successful or error response. */
+    afterResponse?: (res: Response) => void | Promise<void>
+  }
 }
 
 // ── Pagination ──────────────────────────────────────────────────────────────
@@ -19,6 +60,14 @@ export interface Pagination {
   total: number
   totalPages: number
   hasMore: boolean
+}
+
+// ── Rate-limit metadata (extracted from response headers if present) ────────
+
+export interface RateLimitInfo {
+  limit?: number
+  remaining?: number
+  reset?: number
 }
 
 // ── Category / Tag / Author ─────────────────────────────────────────────────
@@ -62,16 +111,13 @@ export interface PostListItem {
   publishedAt: string | null
   createdAt: string
   updatedAt: string
-  /** Rich category objects with color, icon, etc. */
   categoriesData: Category[]
-  /** Rich tag objects */
   tagsData: Tag[]
-  /** Rich author object */
   authorData: Author | null
 }
 
 export interface Post extends PostListItem {
-  /** Full post body — HTML (default) or raw markdown depending on format param. */
+  /** Full post body — HTML (default) or raw markdown depending on `format`. */
   content: string
   /** CSS styles for the post content. Inject into your page for proper styling. */
   contentStyles: string
@@ -97,9 +143,9 @@ export interface ListPostsParams {
 }
 
 export interface GetPostParams {
-  /** "html" returns server-rendered HTML. "markdown" returns raw markdown. Default: "html" */
+  /** `"html"` returns server-rendered HTML. `"markdown"` returns raw markdown. Default: `"html"`. */
   format?: "html" | "markdown"
-  /** When true, wraps content in a styled container with CSS. Default: false */
+  /** When `true`, wraps content in a styled container with CSS. Default: `false`. */
   styled?: boolean
 }
 
@@ -154,7 +200,6 @@ export interface ThingsToDoPage {
   publishedAt: string | null
   createdAt: string
   updatedAt: string
-  /** CSS styles for the page content. */
   contentStyles?: string
 }
 
@@ -169,7 +214,7 @@ export interface ListThingsToDoParams {
 }
 
 export interface GetThingsToDoParams {
-  /** "json" returns structured data. "html" returns pre-rendered sections. Default: "json" */
+  /** `"json"` returns structured data. `"html"` returns pre-rendered sections. Default: `"json"`. */
   format?: "json" | "html"
 }
 
@@ -183,12 +228,4 @@ export interface ListThingsToDoResponse {
 export interface GetThingsToDoResponse {
   page: ThingsToDoPage
   contentStyles?: string
-}
-
-// ── Error ───────────────────────────────────────────────────────────────────
-
-export interface NexoFlowErrorData {
-  status: number
-  message: string
-  url: string
 }

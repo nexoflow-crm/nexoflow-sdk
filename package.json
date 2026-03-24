@@ -1,12 +1,12 @@
 {
   "name": "nexoflow-sdk",
-  "version": "0.1.1",
-  "description": "Official SDK for the NexoFlow Content API — fetch blog posts, pages, and images with full TypeScript support.",
+  "version": "0.2.0",
+  "description": "Official SDK for the NexoFlow Content API — fetch blog posts, pages, and images with full TypeScript support. Universal, isomorphic, production-grade.",
   "author": "NexoFlow <info@nexoflow.net> (https://nexoflow.net)",
   "homepage": "https://nexoflow.net",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nexoflow-crm/nexoflow-sdk"
+    "url": "git+https://github.com/nexoflow-crm/nexoflow-sdk.git"
   },
   "bugs": {
     "url": "https://github.com/nexoflow-crm/nexoflow-sdk/issues"
@@ -39,7 +39,9 @@
     "content-api",
     "blog",
     "seo",
-    "typescript"
+    "typescript",
+    "isomorphic",
+    "universal"
   ],
   "license": "MIT",
   "devDependencies": {
@@ -48,5 +50,6 @@
   },
   "engines": {
     "node": ">=18"
-  }
+  },
+  "sideEffects": false
 }
