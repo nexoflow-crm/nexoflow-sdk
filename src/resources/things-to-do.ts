@@ -35,6 +35,8 @@ export class ThingsToDoResource {
   /**
    * Get a single Things-to-Do page by slug with full attractions.
    *
+   * Each attraction exposes `mapEmbedSrc` (HTTPS URL for `<iframe src={…} />`), `mapEmbed` (full iframe HTML — use with `dangerouslySetInnerHTML`, not as `src`), and `mapLink`.
+   *
    * ```ts
    * const { data } = await nf.thingsToDo.get("things-to-do-in-austin")
    * ```

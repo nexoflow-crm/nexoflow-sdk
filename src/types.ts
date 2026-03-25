@@ -181,8 +181,19 @@ export interface Attraction {
   title: string
   address: string | null
   description: string | null
+  /** Google Maps URL (opens in a new tab). */
   mapLink: string | null
+  /**
+   * Full `<iframe ...></iframe>` HTML from NexoFlow. Use with `dangerouslySetInnerHTML` (or your framework’s equivalent),
+   * not as an iframe `src` attribute.
+   */
   mapEmbed: string | null
+  /**
+   * HTTPS embed URL only (e.g. `https://maps.google.com/maps?...&output=embed`).
+   * **Prefer this** for `<iframe src={mapEmbedSrc} />` in React/Vue/Svelte — avoids putting HTML into `src`.
+   * May be `null` if only a short link exists and the API could not resolve a sync URL.
+   */
+  mapEmbedSrc: string | null
   order: number
 }
 
@@ -200,7 +211,8 @@ export interface ThingsToDoPage {
   publishedAt: string | null
   createdAt: string
   updatedAt: string
-  contentStyles?: string
+  /** Present when `format: "html"` — full article HTML. */
+  contentHtml?: string
 }
 
 // ── Things to Do API params ─────────────────────────────────────────────────
@@ -228,4 +240,5 @@ export interface ListThingsToDoResponse {
 export interface GetThingsToDoResponse {
   page: ThingsToDoPage
   contentStyles?: string
+  layoutHints?: Record<string, unknown>
 }

@@ -215,7 +215,17 @@ nf.thingsToDo.iter(params?)    // Async iterator over all pages
 
 **List params:** `page`, `limit`, `city`, `state`, `sort`
 
-**Get options:** `format` (`"json"` | `"html"`)
+**Get options:** `format` (`"json"` | `"html"`). With `"html"`, the response includes `page.contentHtml` plus top-level `contentStyles` and `layoutHints` for styling and layout guidance.
+
+### Maps / embeds
+
+Each attraction includes:
+
+- **`mapEmbedSrc`** — HTTPS URL only. **Use this** for `<iframe src={attraction.mapEmbedSrc} />` (React, Vue, Svelte, etc.). This avoids passing full HTML into `src`, which browsers treat as a URL string and breaks the embed.
+- **`mapEmbed`** — Full `<iframe …></iframe>` HTML from NexoFlow. Render with `dangerouslySetInnerHTML` (or your framework’s equivalent), **not** as an iframe `src`.
+- **`mapLink`** — Opens the location in Google Maps in a new tab.
+
+`mapEmbedSrc` may be `null` if only a short link was stored and the API could not derive a synchronous embed URL; fall back to `mapEmbed` or `mapLink` in that case.
 
 ---
 
