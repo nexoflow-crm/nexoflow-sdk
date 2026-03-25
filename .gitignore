@@ -1,14 +1,16 @@
-/node_modules
-/dist
-/build
-/coverage
-/logs
-/tmp
-/cache
-/temp
-/test
-/tests
-/docs
-/examples
-/samples
-/demos
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+package-lock.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

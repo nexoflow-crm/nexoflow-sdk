@@ -1,14 +1,40 @@
 # nexoflow-sdk
 
-Official TypeScript SDK for the [NexoFlow](https://nexoflow.net) Content API.
+The official TypeScript SDK for the [NexoFlow](https://nexoflow.net) Content API.
 
-Fetch blog posts, Things-to-Do pages, and images with full type safety — universal, isomorphic, and production-grade. Works in Node.js, Next.js, Nuxt, SvelteKit, Angular, and any JavaScript server runtime.
+[![npm version](https://img.shields.io/npm/v/nexoflow-sdk)](https://www.npmjs.com/package/nexoflow-sdk)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
+## What is NexoFlow?
+
+[NexoFlow](https://nexoflow.net) is an **AI-powered content automation platform**. It lets you generate, schedule, and publish blog posts and social media content — all from one dashboard. NexoFlow handles AI writing, image generation, and multi-channel publishing (WordPress or any JavaScript framework via the Content API), then delivers your content so you can display it on any website.
+
+**nexoflow-sdk** gives you a clean, type-safe way to fetch that content from any JavaScript or TypeScript backend. Zero dependencies, full TypeScript support, built-in retries, and works everywhere Node.js runs.
+
+### Why use the SDK?
+
+- **Zero dependencies** — nothing to audit, nothing to break.
+- **Full TypeScript support** — every response is typed, autocomplete works out of the box.
+- **Built-in retries & timeouts** — transient failures are handled automatically with exponential backoff.
+- **Async iterators** — paginate through thousands of posts with a simple `for await` loop.
+- **Framework-agnostic** — works in Next.js, Nuxt, SvelteKit, Astro, Remix, Express, Fastify, Cloudflare Workers, Deno, Bun, and any server runtime.
+- **ISR-ready** — pass `revalidate` and the SDK sets the right cache headers for Next.js Incremental Static Regeneration.
+
+---
 
 ## Install
 
 ```bash
 npm install nexoflow-sdk
 ```
+
+```bash
+# or with yarn / pnpm
+yarn add nexoflow-sdk
+pnpm add nexoflow-sdk
+```
+
+---
 
 ## Quick Start
 
@@ -17,12 +43,20 @@ import { NexoFlow } from "nexoflow-sdk"
 
 const nf = new NexoFlow({ apiKey: process.env.NEXOFLOW_API_KEY! })
 
-// List posts
+// List recent posts
 const { data } = await nf.posts.list({ limit: 10 })
-console.log(data.posts)
+console.log(data.posts)       // PostListItem[]
+console.log(data.pagination)  // { page, limit, total, hasMore }
 
-// Get a single post
-const { data: post } = await nf.posts.get("my-post-slug")
+// Get a single post by slug
+const { data: post } = await nf.posts.get("my-first-post")
+console.log(post.title)
+console.log(post.content) // full HTML content
+
+// Iterate over ALL posts (auto-paginates)
+for await (const post of nf.posts.iter()) {
+  console.log(post.title)
+}
 ```
 
 ---
@@ -40,14 +74,9 @@ Your NexoFlow API key (`pk_live_*`) is a **secret**. Treat it like a database pa
 **Do:**
 
 - Store the key in an **environment variable** (e.g. `NEXOFLOW_API_KEY`)
-- Only call the SDK from **server-side** code (see Framework Usage below)
+- Only call the SDK from **server-side** code (Server Components, API routes, server loaders, etc.)
 
-```ts
-// Always read from env vars — never hard-code
-const nf = new NexoFlow({ apiKey: process.env.NEXOFLOW_API_KEY! })
-```
-
-If the SDK detects it is running in a browser (`window` is defined), it will print a console warning. Execution is **not** blocked, but the warning indicates a security misconfiguration.
+If the SDK detects it is running in a browser (`window` is defined), it prints a console warning. Execution is not blocked, but the warning indicates a security misconfiguration.
 
 ---
 
@@ -129,9 +158,9 @@ console.log(rateLimit?.remaining)
 
 ```ts
 nf.posts.list(params?)    // List posts (paginated)
-nf.posts.get(slug, opts?) // Get single post with content
+nf.posts.get(slug, opts?) // Get single post with full content
 nf.posts.all(params?)     // Get ALL posts (auto-paginated)
-nf.posts.slugs()          // Get all slugs (for generateStaticParams)
+nf.posts.slugs()          // Get all slugs (for static generation)
 nf.posts.iter(params?)    // Async iterator over all posts
 ```
 
@@ -139,7 +168,30 @@ nf.posts.iter(params?)    // Async iterator over all posts
 
 **Get options:** `format` (`"html"` | `"markdown"`), `styled` (`boolean`)
 
-### Async Iterator
+### Examples
+
+**Blog index with pagination:**
+
+```ts
+const { data } = await nf.posts.list({ limit: 12, category: "engineering" })
+
+for (const post of data.posts) {
+  console.log(`${post.title} — ${post.excerpt}`)
+}
+
+if (data.pagination.hasMore) {
+  const { data: page2 } = await nf.posts.list({ limit: 12, page: 2 })
+}
+```
+
+**Static site generation (get all slugs):**
+
+```ts
+const slugs = await nf.posts.slugs()
+// [{ slug: "intro-to-nextjs" }, { slug: "deploy-to-vercel" }, ...]
+```
+
+**Async iterator — process every post without manual pagination:**
 
 ```ts
 for await (const post of nf.posts.iter({ category: "news" })) {
@@ -150,6 +202,8 @@ for await (const post of nf.posts.iter({ category: "news" })) {
 ---
 
 ## Things to Do
+
+For location-based content pages with structured attraction data.
 
 ```ts
 nf.thingsToDo.list(params?)    // List pages (paginated)
@@ -174,27 +228,27 @@ try {
   const { data } = await nf.posts.get("nonexistent")
 } catch (err) {
   if (err instanceof NexoFlowError) {
-    console.log(err.status)        // 404
-    console.log(err.code)          // "HTTP_404"
-    console.log(err.message)       // "Post not found."
-    console.log(err.requestId)     // server request ID (if available)
-    console.log(err.isNotFound)    // true
+    console.log(err.status)         // 404
+    console.log(err.code)           // "HTTP_404"
+    console.log(err.message)        // "Post not found."
+    console.log(err.requestId)      // server request ID (if available)
+    console.log(err.isNotFound)     // true
     console.log(err.isUnauthorized) // false
-    console.log(err.isRateLimited) // false
+    console.log(err.isRateLimited)  // false
   }
 }
 ```
 
 ---
 
-## Framework Usage
+## Framework Examples
 
 ### Next.js (App Router)
 
-Use the SDK in **Server Components**, **Route Handlers**, or `generateStaticParams`. Never in client components.
+Use the SDK in **Server Components**, **Route Handlers**, or `generateStaticParams`. Never import it in client components.
 
 ```tsx
-// app/blog/page.tsx (Server Component)
+// app/blog/page.tsx — Server Component
 import { NexoFlow } from "nexoflow-sdk"
 
 const nf = new NexoFlow({
@@ -204,20 +258,28 @@ const nf = new NexoFlow({
 
 export default async function BlogPage() {
   const { data } = await nf.posts.list({ limit: 12 })
+
   return (
-    <div>
+    <main>
       {data.posts.map((post) => (
         <article key={post.slug}>
-          <h2>{post.title}</h2>
+          {post.featuredImageUrl && (
+            <img src={post.featuredImageUrl} alt={post.title} />
+          )}
+          <a href={`/blog/${post.slug}`}><h2>{post.title}</h2></a>
+          <p>{post.excerpt}</p>
         </article>
       ))}
-    </div>
+      {data.pagination.hasMore && (
+        <a href={`/blog?page=${data.pagination.page + 1}`}>Next page</a>
+      )}
+    </main>
   )
 }
 ```
 
 ```tsx
-// app/blog/[slug]/page.tsx
+// app/blog/[slug]/page.tsx — Single post with static generation
 import { NexoFlow, NexoFlowError } from "nexoflow-sdk"
 import { notFound } from "next/navigation"
 
@@ -229,11 +291,13 @@ export async function generateStaticParams() {
 
 export default async function PostPage({ params }: { params: { slug: string } }) {
   try {
-    const { data: post } = await nf.posts.get(params.slug)
+    const { data: post } = await nf.posts.get(params.slug, { styled: true })
     return (
       <article>
         <h1>{post.title}</h1>
-        <style dangerouslySetInnerHTML={{ __html: post.contentStyles }} />
+        {post.contentStyles && (
+          <style dangerouslySetInnerHTML={{ __html: post.contentStyles }} />
+        )}
         <div dangerouslySetInnerHTML={{ __html: post.content }} />
       </article>
     )
@@ -244,12 +308,12 @@ export default async function PostPage({ params }: { params: { slug: string } })
 }
 ```
 
-### Vue / Nuxt
+### Nuxt 3
 
-Use in **server routes** or **server-side composables** only:
+Use in **server routes** — the API key stays on the server:
 
 ```ts
-// server/api/posts.ts (Nuxt server route)
+// server/api/posts.ts
 import { NexoFlow } from "nexoflow-sdk"
 
 const nf = new NexoFlow({ apiKey: process.env.NEXOFLOW_API_KEY! })
@@ -260,43 +324,116 @@ export default defineEventHandler(async () => {
 })
 ```
 
+```vue
+<!-- pages/blog.vue -->
+<script setup>
+const { data: blogData } = await useFetch("/api/posts")
+</script>
+
+<template>
+  <article v-for="post in blogData.posts" :key="post.slug">
+    <NuxtLink :to="`/blog/${post.slug}`">
+      <h2>{{ post.title }}</h2>
+    </NuxtLink>
+    <p>{{ post.excerpt }}</p>
+  </article>
+</template>
+```
+
 ### SvelteKit
 
-Use in **`load` functions** (server-side):
+Use in **`load` functions** (`+page.server.ts`):
 
 ```ts
 // src/routes/blog/+page.server.ts
 import { NexoFlow } from "nexoflow-sdk"
+import { NEXOFLOW_API_KEY } from "$env/static/private"
 
-const nf = new NexoFlow({ apiKey: import.meta.env.NEXOFLOW_API_KEY })
+const nf = new NexoFlow({ apiKey: NEXOFLOW_API_KEY })
 
 export async function load() {
   const { data } = await nf.posts.list({ limit: 20 })
-  return { posts: data.posts }
+  return { posts: data.posts, pagination: data.pagination }
 }
 ```
 
-### Angular
+### Astro
 
-Angular runs in the browser. Use the SDK via a **backend API** or Angular Universal SSR:
+Use in **frontmatter** (runs at build time or SSR):
+
+```astro
+---
+// src/pages/blog.astro
+import { NexoFlow } from "nexoflow-sdk"
+
+const nf = new NexoFlow({ apiKey: import.meta.env.NEXOFLOW_API_KEY })
+const { data } = await nf.posts.list({ limit: 20 })
+---
+
+<html>
+<body>
+  {data.posts.map((post) => (
+    <article>
+      <a href={`/blog/${post.slug}`}><h2>{post.title}</h2></a>
+      <p>{post.excerpt}</p>
+    </article>
+  ))}
+</body>
+</html>
+```
+
+### Remix
+
+Use in **`loader` functions**:
 
 ```ts
-// Backend API (Express, NestJS, etc.)
+// app/routes/blog.tsx
+import { json } from "@remix-run/node"
+import { useLoaderData, Link } from "@remix-run/react"
 import { NexoFlow } from "nexoflow-sdk"
 
 const nf = new NexoFlow({ apiKey: process.env.NEXOFLOW_API_KEY! })
 
-app.get("/api/posts", async (req, res) => {
-  const { data } = await nf.posts.list()
-  res.json(data)
-})
+export async function loader() {
+  const { data } = await nf.posts.list({ limit: 20 })
+  return json(data)
+}
+
+export default function Blog() {
+  const { posts } = useLoaderData<typeof loader>()
+  return (
+    <main>
+      {posts.map((post) => (
+        <article key={post.slug}>
+          <Link to={`/blog/${post.slug}`}><h2>{post.title}</h2></Link>
+          <p>{post.excerpt}</p>
+        </article>
+      ))}
+    </main>
+  )
+}
 ```
 
-Then call your own API from the Angular service — never import the SDK directly in Angular components.
+### Express / Fastify
+
+```ts
+import express from "express"
+import { NexoFlow } from "nexoflow-sdk"
+
+const app = express()
+const nf = new NexoFlow({ apiKey: process.env.NEXOFLOW_API_KEY! })
+
+app.get("/api/posts", async (req, res) => {
+  const { data } = await nf.posts.list({ limit: 20 })
+  res.json(data)
+})
+
+app.listen(3000)
+```
 
 ### Edge Runtimes (Cloudflare Workers, Vercel Edge)
 
-The SDK uses `globalThis.fetch` and `AbortSignal.timeout`, both available in edge runtimes:
+The SDK uses `globalThis.fetch` and `AbortSignal.timeout` — both available natively in edge runtimes:
 
 ```ts
 export default {
@@ -315,15 +452,30 @@ export default {
 Every response is fully typed. Import individual types as needed:
 
 ```ts
-import type { Post, PostListItem, Category, Author, Pagination, ApiResponse } from "nexoflow-sdk"
+import type {
+  Post,
+  PostListItem,
+  Category,
+  Author,
+  Tag,
+  Pagination,
+  ApiResponse,
+  RateLimitInfo,
+} from "nexoflow-sdk"
 ```
 
 ---
 
 ## Requirements
 
-- Node.js 18+ (uses native `fetch` and `AbortSignal.timeout`)
-- Works with Next.js, Nuxt, SvelteKit, Astro, Remix, Angular (server-side), Cloudflare Workers, Deno, Bun
+- **Node.js 18+** (uses native `fetch` and `AbortSignal.timeout`)
+- Works with Next.js, Nuxt, SvelteKit, Astro, Remix, Express, Fastify, Angular (server-side), Cloudflare Workers, Deno, and Bun
+
+## Links
+
+- [NexoFlow Dashboard](https://nexoflow.net) — create your project and get an API key
+- [GitHub](https://github.com/nexoflow-crm/nexoflow-sdk) — source code, issues, contributions
+- [npm](https://www.npmjs.com/package/nexoflow-sdk) — package registry
 
 ## License
 
