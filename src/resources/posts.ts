@@ -5,8 +5,7 @@ import type {
   GetPostParams,
   GetPostResponse,
   PostListItem,
-  Pagination,
-  RateLimitInfo,
+  RequestOptions,
 } from "../types"
 
 export class PostsResource {
@@ -22,6 +21,7 @@ export class PostsResource {
    */
   async list(
     params?: ListPostsParams,
+    options?: RequestOptions,
   ): Promise<ApiResponse<ListPostsResponse>> {
     return this.http.request<ListPostsResponse>({
       path: "/api/v1/content/posts",
@@ -32,6 +32,8 @@ export class PostsResource {
         category: params?.category,
         sort: params?.sort,
       },
+      signal: options?.signal,
+      revalidate: options?.revalidate,
     })
   }
 
@@ -45,30 +47,43 @@ export class PostsResource {
   async get(
     slug: string,
     params?: GetPostParams,
+    options?: RequestOptions,
   ): Promise<ApiResponse<GetPostResponse>> {
+    if (!slug || typeof slug !== "string") {
+      throw new Error("nexoflow-sdk: `slug` is required and must be a non-empty string.")
+    }
     return this.http.request<GetPostResponse>({
       path: `/api/v1/content/posts/${encodeURIComponent(slug)}`,
       params: {
         format: params?.format,
         styled: params?.styled ? "true" : undefined,
       },
+      signal: options?.signal,
+      revalidate: options?.revalidate,
     })
   }
 
   /**
    * Fetch **all** posts across every page. Useful for static site generation.
    *
+   * Automatically paginates through all available data. To cancel
+   * a long-running fetch, pass an `AbortSignal` via options.
+   *
    * ```ts
    * const allPosts = await nf.posts.all()
    * ```
    */
-  async all(params?: Omit<ListPostsParams, "page">): Promise<PostListItem[]> {
+  async all(
+    params?: Omit<ListPostsParams, "page">,
+    options?: RequestOptions,
+  ): Promise<PostListItem[]> {
     const allPosts: PostListItem[] = []
     let page = 1
     let hasMore = true
 
     while (hasMore) {
-      const { data } = await this.list({ ...params, page, limit: 100 })
+      const { data } = await this.list({ ...params, page, limit: 100 }, options)
+      if (data.posts.length === 0) break
       allPosts.push(...data.posts)
       hasMore = data.pagination.hasMore
       page++
@@ -86,8 +101,8 @@ export class PostsResource {
    * }
    * ```
    */
-  async slugs(): Promise<Array<{ slug: string }>> {
-    const posts = await this.all()
+  async slugs(options?: RequestOptions): Promise<Array<{ slug: string }>> {
+    const posts = await this.all(undefined, options)
     return posts.map((p) => ({ slug: p.slug }))
   }
 
@@ -102,12 +117,14 @@ export class PostsResource {
    */
   async *iter(
     params?: Omit<ListPostsParams, "page">,
+    options?: RequestOptions,
   ): AsyncGenerator<PostListItem, void, undefined> {
     let page = 1
     let hasMore = true
 
     while (hasMore) {
-      const { data } = await this.list({ ...params, page, limit: 100 })
+      const { data } = await this.list({ ...params, page, limit: 100 }, options)
+      if (data.posts.length === 0) break
       for (const post of data.posts) {
         yield post
       }

@@ -4,8 +4,10 @@ import { PostsResource } from "./resources/posts"
 import { ThingsToDoResource } from "./resources/things-to-do"
 import { VERSION } from "./version"
 
+const API_KEY_PREFIX = "pk_live_"
+
 /**
- * NexoFlow SDK client — universal, isomorphic, production-grade.
+ * NexoFlow SDK client - universal, isomorphic, enterprise-grade.
  *
  * **Server-side usage only.** Your `pk_live_*` key is a secret.
  * Never instantiate this class in browser-side code, React client components,
@@ -21,9 +23,9 @@ import { VERSION } from "./version"
  * ```
  */
 export class NexoFlow {
-  /** Posts resource — list, get, iterate. */
+  /** Posts resource - list, get, iterate, fetch all. */
   readonly posts: PostsResource
-  /** Things-to-Do resource — list, get, iterate. */
+  /** Things-to-Do resource - list, get, iterate, fetch all. */
   readonly thingsToDo: ThingsToDoResource
   /** SDK version string. */
   static readonly version: string = VERSION
@@ -37,14 +39,43 @@ export class NexoFlow {
       )
     }
 
-    // ── Browser environment warning ───────────────────────────────────────
-    if (typeof window !== "undefined") {
-      console.warn(
-        "NexoFlow: This SDK is intended for server-side use. " +
-          "Do not expose your API key in the browser. " +
-          "If you see this in production, move your NexoFlow calls to a " +
-          "server component, API route, or backend service.",
+    if (typeof config.apiKey !== "string") {
+      throw new Error("nexoflow-sdk: `apiKey` must be a string.")
+    }
+
+    if (!config.apiKey.startsWith(API_KEY_PREFIX)) {
+      throw new Error(
+        `nexoflow-sdk: Invalid API key format. Keys must start with "${API_KEY_PREFIX}". ` +
+          "Get your key from the NexoFlow dashboard -> Content API.",
       )
+    }
+
+    // ── Browser environment guard ──────────────────────────────────────────
+    if (typeof window !== "undefined") {
+      const isBrowser =
+        typeof document !== "undefined" &&
+        typeof navigator !== "undefined"
+
+      if (isBrowser) {
+        console.warn(
+          "[nexoflow-sdk] SECURITY WARNING: This SDK is intended for server-side use only. " +
+            "Your API key is being exposed in a browser environment. " +
+            "Move your NexoFlow calls to a server component, API route, or backend service.",
+        )
+      }
+    }
+
+    // ── Validate optional config ───────────────────────────────────────────
+    if (config.timeout !== undefined && (config.timeout <= 0 || !Number.isFinite(config.timeout))) {
+      throw new Error("nexoflow-sdk: `timeout` must be a positive finite number.")
+    }
+
+    if (config.retry?.attempts !== undefined && (config.retry.attempts < 1 || !Number.isInteger(config.retry.attempts))) {
+      throw new Error("nexoflow-sdk: `retry.attempts` must be a positive integer.")
+    }
+
+    if (config.retry?.delay !== undefined && (config.retry.delay < 0 || !Number.isFinite(config.retry.delay))) {
+      throw new Error("nexoflow-sdk: `retry.delay` must be a non-negative finite number.")
     }
 
     // ── Build internals ───────────────────────────────────────────────────

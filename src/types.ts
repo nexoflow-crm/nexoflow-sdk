@@ -4,7 +4,7 @@ export interface NexoFlowConfig {
   /**
    * Your project API key (`pk_live_…`). **Required.**
    *
-   * **WARNING — this key is SECRET.** Never expose it in browser-side code,
+   * **WARNING - this key is SECRET.** Never expose it in browser-side code,
    * HTML source, or client bundles. Always read it from an environment
    * variable on the server:
    *
@@ -33,13 +33,13 @@ export interface NexoFlowConfig {
   retry?: {
     /** Maximum number of attempts (including the initial request). Defaults to `3`. */
     attempts?: number
-    /** Base delay between retries in ms (doubles each attempt). Defaults to `500`. */
+    /** Base delay between retries in ms (exponential backoff with jitter). Defaults to `500`. */
     delay?: number
   }
 
   /**
    * When `true` every request and response is logged to `console.debug`.
-   * Works in both Node.js and browser consoles.
+   * API keys are masked in debug output. Works in both Node.js and browser consoles.
    */
   debug?: boolean
 
@@ -50,6 +50,15 @@ export interface NexoFlowConfig {
     /** Called after each successful or error response. */
     afterResponse?: (res: Response) => void | Promise<void>
   }
+}
+
+// ── Request Options (per-call overrides) ────────────────────────────────────
+
+export interface RequestOptions {
+  /** Per-request AbortSignal for cancellation (composed with the global timeout). */
+  signal?: AbortSignal
+  /** Override the default ISR revalidate hint for this request only. */
+  revalidate?: number | false
 }
 
 // ── Pagination ──────────────────────────────────────────────────────────────
@@ -117,7 +126,7 @@ export interface PostListItem {
 }
 
 export interface Post extends PostListItem {
-  /** Full post body — HTML (default) or raw markdown depending on `format`. */
+  /** Full post body - HTML (default) or raw markdown depending on `format`. */
   content: string
   /** CSS styles for the post content. Inject into your page for proper styling. */
   contentStyles: string
@@ -184,13 +193,13 @@ export interface Attraction {
   /** Google Maps URL (opens in a new tab). */
   mapLink: string | null
   /**
-   * Full `<iframe ...></iframe>` HTML from NexoFlow. Use with `dangerouslySetInnerHTML` (or your framework’s equivalent),
+   * Full `<iframe ...></iframe>` HTML from NexoFlow. Use with `dangerouslySetInnerHTML` (or your framework's equivalent),
    * not as an iframe `src` attribute.
    */
   mapEmbed: string | null
   /**
    * HTTPS embed URL only (e.g. `https://maps.google.com/maps?...&output=embed`).
-   * **Prefer this** for `<iframe src={mapEmbedSrc} />` in React/Vue/Svelte — avoids putting HTML into `src`.
+   * **Prefer this** for `<iframe src={mapEmbedSrc} />` in React/Vue/Svelte - avoids putting HTML into `src`.
    * May be `null` if only a short link exists and the API could not resolve a sync URL.
    */
   mapEmbedSrc: string | null
@@ -211,7 +220,7 @@ export interface ThingsToDoPage {
   publishedAt: string | null
   createdAt: string
   updatedAt: string
-  /** Present when `format: "html"` — full article HTML. */
+  /** Present when `format: "html"` - full article HTML. */
   contentHtml?: string
 }
 

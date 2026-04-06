@@ -7,18 +7,18 @@ The official TypeScript SDK for the [NexoFlow](https://nexoflow.net) Content API
 
 ## What is NexoFlow?
 
-[NexoFlow](https://nexoflow.net) is an **AI-powered content automation platform**. It lets you generate, schedule, and publish blog posts and social media content — all from one dashboard. NexoFlow handles AI writing, image generation, and multi-channel publishing (WordPress or any JavaScript framework via the Content API), then delivers your content so you can display it on any website.
+[NexoFlow](https://nexoflow.net) is an **AI-powered content automation platform**. It lets you generate, schedule, and publish blog posts and social media content - all from one dashboard. NexoFlow handles AI writing, image generation, and multi-channel publishing (WordPress or any JavaScript framework via the Content API), then delivers your content so you can display it on any website.
 
 **nexoflow-sdk** gives you a clean, type-safe way to fetch that content from any JavaScript or TypeScript backend. Zero dependencies, full TypeScript support, built-in retries, and works everywhere Node.js runs.
 
 ### Why use the SDK?
 
-- **Zero dependencies** — nothing to audit, nothing to break.
-- **Full TypeScript support** — every response is typed, autocomplete works out of the box.
-- **Built-in retries & timeouts** — transient failures are handled automatically with exponential backoff.
-- **Async iterators** — paginate through thousands of posts with a simple `for await` loop.
-- **Framework-agnostic** — works in Next.js, Nuxt, SvelteKit, Astro, Remix, Express, Fastify, Cloudflare Workers, Deno, Bun, and any server runtime.
-- **ISR-ready** — pass `revalidate` and the SDK sets the right cache headers for Next.js Incremental Static Regeneration.
+- **Zero dependencies** - nothing to audit, nothing to break.
+- **Full TypeScript support** - every response is typed, autocomplete works out of the box.
+- **Built-in retries & timeouts** - transient failures are handled automatically with exponential backoff.
+- **Async iterators** - paginate through thousands of posts with a simple `for await` loop.
+- **Framework-agnostic** - works in Next.js, Nuxt, SvelteKit, Astro, Remix, Express, Fastify, Cloudflare Workers, Deno, Bun, and any server runtime.
+- **ISR-ready** - pass `revalidate` and the SDK sets the right cache headers for Next.js Incremental Static Regeneration.
 
 ---
 
@@ -176,7 +176,7 @@ nf.posts.iter(params?)    // Async iterator over all posts
 const { data } = await nf.posts.list({ limit: 12, category: "engineering" })
 
 for (const post of data.posts) {
-  console.log(`${post.title} — ${post.excerpt}`)
+  console.log(`${post.title} - ${post.excerpt}`)
 }
 
 if (data.pagination.hasMore) {
@@ -191,7 +191,7 @@ const slugs = await nf.posts.slugs()
 // [{ slug: "intro-to-nextjs" }, { slug: "deploy-to-vercel" }, ...]
 ```
 
-**Async iterator — process every post without manual pagination:**
+**Async iterator - process every post without manual pagination:**
 
 ```ts
 for await (const post of nf.posts.iter({ category: "news" })) {
@@ -221,9 +221,9 @@ nf.thingsToDo.iter(params?)    // Async iterator over all pages
 
 Each attraction includes:
 
-- **`mapEmbedSrc`** — HTTPS URL only. **Use this** for `<iframe src={attraction.mapEmbedSrc} />` (React, Vue, Svelte, etc.). This avoids passing full HTML into `src`, which browsers treat as a URL string and breaks the embed.
-- **`mapEmbed`** — Full `<iframe …></iframe>` HTML from NexoFlow. Render with `dangerouslySetInnerHTML` (or your framework’s equivalent), **not** as an iframe `src`.
-- **`mapLink`** — Opens the location in Google Maps in a new tab.
+- **`mapEmbedSrc`** - HTTPS URL only. **Use this** for `<iframe src={attraction.mapEmbedSrc} />` (React, Vue, Svelte, etc.). This avoids passing full HTML into `src`, which browsers treat as a URL string and breaks the embed.
+- **`mapEmbed`** - Full `<iframe …></iframe>` HTML from NexoFlow. Render with `dangerouslySetInnerHTML` (or your framework’s equivalent), **not** as an iframe `src`.
+- **`mapLink`** - Opens the location in Google Maps in a new tab.
 
 `mapEmbedSrc` may be `null` if only a short link was stored and the API could not derive a synchronous embed URL; fall back to `mapEmbed` or `mapLink` in that case.
 
@@ -258,7 +258,7 @@ try {
 Use the SDK in **Server Components**, **Route Handlers**, or `generateStaticParams`. Never import it in client components.
 
 ```tsx
-// app/blog/page.tsx — Server Component
+// app/blog/page.tsx - Server Component
 import { NexoFlow } from "nexoflow-sdk"
 
 const nf = new NexoFlow({
@@ -289,7 +289,7 @@ export default async function BlogPage() {
 ```
 
 ```tsx
-// app/blog/[slug]/page.tsx — Single post with static generation
+// app/blog/[slug]/page.tsx - Single post with static generation
 import { NexoFlow, NexoFlowError } from "nexoflow-sdk"
 import { notFound } from "next/navigation"
 
@@ -320,7 +320,7 @@ export default async function PostPage({ params }: { params: { slug: string } })
 
 ### Nuxt 3
 
-Use in **server routes** — the API key stays on the server:
+Use in **server routes** - the API key stays on the server:
 
 ```ts
 // server/api/posts.ts
@@ -443,7 +443,7 @@ app.listen(3000)
 
 ### Edge Runtimes (Cloudflare Workers, Vercel Edge)
 
-The SDK uses `globalThis.fetch` and `AbortSignal.timeout` — both available natively in edge runtimes:
+The SDK uses `globalThis.fetch` and `AbortSignal.timeout` - both available natively in edge runtimes:
 
 ```ts
 export default {
@@ -483,9 +483,9 @@ import type {
 
 ## Links
 
-- [NexoFlow Dashboard](https://nexoflow.net) — create your project and get an API key
-- [GitHub](https://github.com/nexoflow-crm/nexoflow-sdk) — source code, issues, contributions
-- [npm](https://www.npmjs.com/package/nexoflow-sdk) — package registry
+- [NexoFlow Dashboard](https://nexoflow.net) - create your project and get an API key
+- [GitHub](https://github.com/nexoflow-crm/nexoflow-sdk) - source code, issues, contributions
+- [npm](https://www.npmjs.com/package/nexoflow-sdk) - package registry
 
 ## License
 

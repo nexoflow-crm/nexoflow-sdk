@@ -4,6 +4,7 @@ export { VERSION } from "./version"
 
 export type {
   NexoFlowConfig,
+  RequestOptions,
   Pagination,
   RateLimitInfo,
   Category,

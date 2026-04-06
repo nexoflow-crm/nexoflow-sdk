@@ -1,7 +1,7 @@
 {
   "name": "nexoflow-sdk",
-  "version": "0.2.2",
-  "description": "Official SDK for the NexoFlow Content API — fetch AI-generated blog posts and content with full TypeScript support. Zero dependencies, built-in retries, works in any server runtime.",
+  "version": "0.3.0",
+  "description": "Official SDK for the NexoFlow Content API - fetch AI-generated blog posts and content with full TypeScript support. Zero dependencies, built-in retries, works in any server runtime.",
   "author": "NexoFlow <info@nexoflow.net> (https://nexoflow.net)",
   "homepage": "https://nexoflow.net",
   "repository": {
