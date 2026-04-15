@@ -180,6 +180,8 @@ export interface ThingsToDoListItem {
   heroImageUrl: string | null
   metaTitle: string | null
   metaDescription: string | null
+  /** When true, omit from search indexes (e.g. pass through to `robots` / meta noindex). */
+  noIndex: boolean
   attractionCount: number
   publishedAt: string | null
   createdAt: string
@@ -216,6 +218,8 @@ export interface ThingsToDoPage {
   heroDescription: string | null
   metaTitle: string | null
   metaDescription: string | null
+  /** When true, omit from search indexes (e.g. `generateMetadata` → `robots: { index: false, follow: false }`). */
+  noIndex: boolean
   attractions: Attraction[]
   publishedAt: string | null
   createdAt: string

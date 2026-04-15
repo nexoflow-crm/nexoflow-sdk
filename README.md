@@ -217,6 +217,31 @@ nf.thingsToDo.iter(params?)    // Async iterator over all pages
 
 **Get options:** `format` (`"json"` | `"html"`). With `"html"`, the response includes `page.contentHtml` plus top-level `contentStyles` and `layoutHints` for styling and layout guidance.
 
+**SEO:** Each list item and full page includes `noIndex` (boolean). When it is `true`, tell crawlers not to index the URL—for example in Next.js App Router:
+
+```ts
+// app/things-to-do/[slug]/page.tsx
+import type { Metadata } from "next"
+import { NexoFlow } from "nexoflow-sdk"
+
+const nf = new NexoFlow({ apiKey: process.env.NEXOFLOW_API_KEY! })
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const { data } = await nf.thingsToDo.get(slug)
+  const page = data.page
+  return {
+    title: page.metaTitle || page.pageTitle,
+    description: page.metaDescription ?? undefined,
+    ...(page.noIndex ? { robots: { index: false, follow: false } } : {}),
+  }
+}
+```
+
 ### Maps / embeds
 
 Each attraction includes:
