@@ -35,7 +35,7 @@ export class NexoFlow {
     if (!config.apiKey) {
       throw new Error(
         "nexoflow-sdk: `apiKey` is required. " +
-          "Get your key from the NexoFlow dashboard -> Content API.",
+          "Get your key from the NexoFlow dashboard -> Developer API.",
       )
     }
 
@@ -46,7 +46,7 @@ export class NexoFlow {
     if (!config.apiKey.startsWith(API_KEY_PREFIX)) {
       throw new Error(
         `nexoflow-sdk: Invalid API key format. Keys must start with "${API_KEY_PREFIX}". ` +
-          "Get your key from the NexoFlow dashboard -> Content API.",
+          "Get your key from the NexoFlow dashboard -> Developer API.",
       )
     }
 

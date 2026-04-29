@@ -1,13 +1,13 @@
 # nexoflow-sdk
 
-The official TypeScript SDK for the [NexoFlow](https://nexoflow.net) Content API.
+The official TypeScript SDK for the [NexoFlow](https://nexoflow.ai) Developer API.
 
 [![npm version](https://img.shields.io/npm/v/nexoflow-sdk)](https://www.npmjs.com/package/nexoflow-sdk)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 ## What is NexoFlow?
 
-[NexoFlow](https://nexoflow.net) is an **AI-powered content automation platform**. It lets you generate, schedule, and publish blog posts and social media content - all from one dashboard. NexoFlow handles AI writing, image generation, and multi-channel publishing (WordPress or any JavaScript framework via the Content API), then delivers your content so you can display it on any website.
+[NexoFlow](https://nexoflow.ai) is an **AI-powered content automation platform**. It lets you generate, schedule, and publish blog posts and social media content - all from one dashboard. NexoFlow handles AI writing, image generation, and multi-channel publishing (WordPress or any JavaScript framework via the Developer API), then delivers your content so you can display it on any website.
 
 **nexoflow-sdk** gives you a clean, type-safe way to fetch that content from any JavaScript or TypeScript backend. Zero dependencies, full TypeScript support, built-in retries, and works everywhere Node.js runs.
 
@@ -58,6 +58,10 @@ for await (const post of nf.posts.iter()) {
   console.log(post.title)
 }
 ```
+
+### Related posts
+
+List responses include `relatedPosts` and `relatedPostSlugs` (the same ordered slug array). When you fetch a single post with `posts.get(slug)`, the API also returns `relatedArticles`: one card per slug with title, meta title, featured image URL, and published date. Unpublished or missing neighbors still appear in order with null fields.
 
 ---
 
@@ -217,7 +221,7 @@ nf.thingsToDo.iter(params?)    // Async iterator over all pages
 
 **Get options:** `format` (`"json"` | `"html"`). With `"html"`, the response includes `page.contentHtml` plus top-level `contentStyles` and `layoutHints` for styling and layout guidance.
 
-**SEO:** Each list item and full page includes `noIndex` (boolean). When it is `true`, tell crawlers not to index the URL—for example in Next.js App Router:
+**SEO:** Each list item and full page includes `noIndex` (boolean). When it is `true`, tell crawlers not to index the URL-for example in Next.js App Router:
 
 ```ts
 // app/things-to-do/[slug]/page.tsx
@@ -490,6 +494,7 @@ Every response is fully typed. Import individual types as needed:
 import type {
   Post,
   PostListItem,
+  RelatedArticle,
   Category,
   Author,
   Tag,

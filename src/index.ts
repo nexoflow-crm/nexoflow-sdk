@@ -10,6 +10,7 @@ export type {
   Category,
   Tag,
   Author,
+  RelatedArticle,
   PostListItem,
   Post,
   ThingsToDoRef,

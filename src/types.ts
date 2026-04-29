@@ -106,6 +106,20 @@ export interface Author {
 
 // ── Posts ────────────────────────────────────────────────────────────────────
 
+/**
+ * Resolved card for a related blog post (single-post endpoint only).
+ * Order matches {@link Post.relatedPostSlugs}. Missing or unpublished slugs
+ * appear with null metadata fields.
+ */
+export interface RelatedArticle {
+  slug: string
+  title: string | null
+  metaTitle: string | null
+  /** Absolute URL suitable for `<img src>` (proxied or CDN when applicable). */
+  featuredImageUrl: string | null
+  publishedAt: string | null
+}
+
 export interface PostListItem {
   slug: string
   title: string
@@ -123,6 +137,13 @@ export interface PostListItem {
   categoriesData: Category[]
   tagsData: Tag[]
   authorData: Author | null
+  /**
+   * Ordered related post slugs from the editor (list and single-post responses).
+   * Same as {@link PostListItem.relatedPostSlugs}; both are kept for API backward compatibility.
+   */
+  relatedPosts: string[]
+  /** Same array as `relatedPosts`. */
+  relatedPostSlugs: string[]
 }
 
 export interface Post extends PostListItem {
@@ -132,6 +153,11 @@ export interface Post extends PostListItem {
   contentStyles: string
   /** Related Things-to-Do pages for cross-linking. */
   relatedThingsToDo: ThingsToDoRef[]
+  /**
+   * Resolved metadata for each slug in {@link Post.relatedPostSlugs}.
+   * Not returned on list endpoints; use slugs and fetch details if needed.
+   */
+  relatedArticles: RelatedArticle[]
 }
 
 export interface ThingsToDoRef {
