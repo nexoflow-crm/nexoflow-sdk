@@ -172,6 +172,50 @@ nf.posts.iter(params?)    // Async iterator over all posts
 
 **Get options:** `format` (`"html"` | `"markdown"`), `styled` (`boolean`)
 
+### SEO / robots meta
+
+Both `PostListItem` (list responses) and `Post` (single-post response) include:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `noIndex` | `boolean` | When `true`, tell search engines **not to index** this post |
+| `noFollow` | `boolean` | When `true`, tell search engines **not to follow links** on this post |
+
+Use them when building `<meta name="robots">` or framework metadata:
+
+```ts
+// Next.js App Router — app/blog/[slug]/page.tsx
+import type { Metadata } from "next"
+import { NexoFlow } from "nexoflow-sdk"
+
+const nf = new NexoFlow({ apiKey: process.env.NEXOFLOW_API_KEY! })
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const { data: post } = await nf.posts.get(slug)
+  return {
+    title: post.metaTitle || post.title,
+    description: post.metaDescription ?? undefined,
+    robots: {
+      index: !post.noIndex,
+      follow: !post.noFollow,
+    },
+  }
+}
+```
+
+You can also check the flag in a list response to skip rendering a post or to add a `<meta>` tag manually:
+
+```ts
+for (const post of data.posts) {
+  if (post.noIndex) continue // skip noindex posts from sitemap, etc.
+}
+```
+
 ### Examples
 
 **Blog index with pagination:**

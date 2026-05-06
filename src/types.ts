@@ -144,6 +144,10 @@ export interface PostListItem {
   relatedPosts: string[]
   /** Same array as `relatedPosts`. */
   relatedPostSlugs: string[]
+  /** When true, include `<meta name="robots" content="noindex">` on this page. */
+  noIndex: boolean
+  /** When true, include `nofollow` in the robots meta directive. */
+  noFollow: boolean
 }
 
 export interface Post extends PostListItem {
