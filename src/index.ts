@@ -11,6 +11,8 @@ export type {
   Tag,
   Author,
   RelatedArticle,
+  SiteFeatures,
+  SiteSettingsResponse,
   PostListItem,
   Post,
   ThingsToDoRef,

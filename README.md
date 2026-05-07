@@ -73,7 +73,7 @@ Your NexoFlow API key (`pk_live_*`) is a **secret**. Treat it like a database pa
 
 - Import `nexoflow-sdk` in browser-side code or React client components
 - Hard-code the key in source files that ship to the browser
-- Use the key in `<script>` tags, Vite client bundles, or Angular services
+- Use the key in inline browser scripts, Vite client bundles, or Angular services
 
 **Do:**
 
@@ -180,8 +180,10 @@ Both `PostListItem` (list responses) and `Post` (single-post response) include:
 |-------|------|-------------|
 | `noIndex` | `boolean` | When `true`, tell search engines **not to index** this post |
 | `noFollow` | `boolean` | When `true`, tell search engines **not to follow links** on this post |
+| `readingTimeMinutes` | `number` | Estimated reading time (min 1). Render as "X min read". |
+| `path` | `string` | Resolved URL path built from the project's permalink structure (e.g. `/2024/03/my-post`). Use directly as an `href`. |
 
-Use them when building `<meta name="robots">` or framework metadata:
+Use them when configuring robots meta tags or framework metadata:
 
 ```ts
 // Next.js App Router — app/blog/[slug]/page.tsx
@@ -208,11 +210,85 @@ export async function generateMetadata({
 }
 ```
 
-You can also check the flag in a list response to skip rendering a post or to add a `<meta>` tag manually:
+You can also check the flag in a list response to skip rendering a post or to add robots meta manually:
 
 ```ts
 for (const post of data.posts) {
   if (post.noIndex) continue // skip noindex posts from sitemap, etc.
+}
+```
+
+### Site feature flags & permalink structure
+
+Use `nf.siteSettings.get()` to read the project's global settings once at build time:
+
+```ts
+const { data: siteSettings } = await nf.siteSettings.get()
+
+// permalinkStructure is informational — each post already exposes a resolved `path`
+console.log(siteSettings.permalinkStructure) // e.g. "/%year%/%month%/%slug%"
+
+const {
+  enableReadingTime,   // show "X min read" labels?
+  enableRelatedPosts,  // render related articles section?
+  enableSocialSharing, // render share buttons?
+  enableSchemaMarkup,  // inject JSON-LD BlogPosting schema?
+} = siteSettings.features
+```
+
+#### Reading time
+
+Every post includes `readingTimeMinutes`. Gate the render with the feature flag:
+
+```tsx
+{post.siteFeatures.enableReadingTime && (
+  <span>{post.readingTimeMinutes} min read</span>
+)}
+```
+
+#### Related posts
+
+The `relatedArticles` array on single-post responses already contains resolved cards. Use the toggle to decide whether to render the section:
+
+```tsx
+{post.siteFeatures.enableRelatedPosts && post.relatedArticles.length > 0 && (
+  <RelatedPostsSection articles={post.relatedArticles} />
+)}
+```
+
+#### Social sharing
+
+The `enableSocialSharing` flag tells you whether to render share buttons. Build them with the post's URL (using `path`) and title:
+
+```tsx
+{post.siteFeatures.enableSocialSharing && (
+  <ShareButtons
+    url={`https://yoursite.com${post.path}`}
+    title={post.title}
+  />
+)}
+```
+
+#### JSON-LD schema markup
+
+When `enableSchemaMarkup` is `true`, inject a `BlogPosting` JSON-LD block in your page head (for example via your framework’s metadata or head API).
+
+```ts
+// Next.js App Router — build jsonLd then pass to your head/layout helper
+if (post.siteFeatures.enableSchemaMarkup) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.metaTitle || post.title,
+    description: post.metaDescription ?? undefined,
+    image: post.featuredImageUrl ?? undefined,
+    datePublished: post.publishedAt ?? undefined,
+    dateModified: post.updatedAt,
+    author: post.authorData
+      ? { "@type": "Person", name: post.authorData.name }
+      : undefined,
+  }
+  // e.g. serialize with JSON.stringify(jsonLd) and emit as application/ld+json
 }
 ```
 
@@ -407,12 +483,9 @@ export default defineEventHandler(async () => {
 })
 ```
 
-```vue
-<!-- pages/blog.vue -->
-<script setup>
-const { data: blogData } = await useFetch("/api/posts")
-</script>
+In `pages/blog.vue`, use a Nuxt `script setup` block to call `useFetch("/api/posts")`, then render:
 
+```vue
 <template>
   <article v-for="post in blogData.posts" :key="post.slug">
     <NuxtLink :to="`/blog/${post.slug}`">
@@ -539,6 +612,8 @@ import type {
   Post,
   PostListItem,
   RelatedArticle,
+  SiteFeatures,
+  SiteSettingsResponse,
   Category,
   Author,
   Tag,

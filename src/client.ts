@@ -2,6 +2,7 @@ import type { NexoFlowConfig } from "./types"
 import { createHttpClient } from "./http"
 import { PostsResource } from "./resources/posts"
 import { ThingsToDoResource } from "./resources/things-to-do"
+import { SiteSettingsResource } from "./resources/site-settings"
 import { VERSION } from "./version"
 
 const API_KEY_PREFIX = "pk_live_"
@@ -27,6 +28,8 @@ export class NexoFlow {
   readonly posts: PostsResource
   /** Things-to-Do resource - list, get, iterate, fetch all. */
   readonly thingsToDo: ThingsToDoResource
+  /** Site settings resource - permalink structure and feature flags. */
+  readonly siteSettings: SiteSettingsResource
   /** SDK version string. */
   static readonly version: string = VERSION
 
@@ -82,5 +85,6 @@ export class NexoFlow {
     const http = createHttpClient(config)
     this.posts = new PostsResource(http)
     this.thingsToDo = new ThingsToDoResource(http)
+    this.siteSettings = new SiteSettingsResource(http)
   }
 }

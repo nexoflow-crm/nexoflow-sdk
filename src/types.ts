@@ -104,6 +104,44 @@ export interface Author {
   bio: string | null
 }
 
+// ── Site Settings ────────────────────────────────────────────────────────────
+
+/**
+ * On/off flags for site-wide features, as configured in the NexoFlow dashboard.
+ *
+ * | Flag | What to render when `true` |
+ * |---|---|
+ * | `enableReadingTime` | "X min read" label on posts |
+ * | `enableRelatedPosts` | Related articles section at the bottom |
+ * | `enableSocialSharing` | Share buttons (Twitter/X, Facebook, LinkedIn, etc.) |
+ * | `enableSchemaMarkup` | `<script type="application/ld+json">` BlogPosting JSON-LD |
+ */
+export interface SiteFeatures {
+  enableRelatedPosts: boolean
+  enableReadingTime: boolean
+  enableSocialSharing: boolean
+  enableSchemaMarkup: boolean
+}
+
+/**
+ * Response from `GET /api/v1/content/site-settings`.
+ *
+ * Use this to read the project's permalink structure and feature flags once at
+ * build time (e.g. inside `generateStaticParams` or a root layout server component).
+ */
+export interface SiteSettingsResponse {
+  /**
+   * Permalink pattern configured in the dashboard.
+   * Tokens: `%slug%`, `%year%`, `%month%`, `%day%`, `%category%`.
+   *
+   * Each post in list/single responses already includes a resolved `path` field,
+   * so you only need this if you're building URLs manually.
+   */
+  permalinkStructure: string
+  /** On/off flags for each site-wide feature. */
+  features: SiteFeatures
+}
+
 // ── Posts ────────────────────────────────────────────────────────────────────
 
 /**
@@ -148,6 +186,18 @@ export interface PostListItem {
   noIndex: boolean
   /** When true, include `nofollow` in the robots meta directive. */
   noFollow: boolean
+  /**
+   * Estimated reading time in minutes (computed from word count at ~225 wpm).
+   * Use this to render a "X min read" label. The dashboard `enableReadingTime`
+   * feature flag controls whether to show it in your UI.
+   */
+  readingTimeMinutes: number
+  /**
+   * Resolved URL path for this post, built from the project's
+   * `permalinkStructure` (e.g. `/%year%/%month%/%slug%` → `/2024/03/my-post`).
+   * Ready to use as an `href` in your link components.
+   */
+  path: string
 }
 
 export interface Post extends PostListItem {
@@ -162,6 +212,12 @@ export interface Post extends PostListItem {
    * Not returned on list endpoints; use slugs and fetch details if needed.
    */
   relatedArticles: RelatedArticle[]
+  /**
+   * On/off flags for each site-wide feature as configured in the NexoFlow dashboard.
+   * Use these to conditionally render reading time, related posts section,
+   * social sharing buttons, and JSON-LD structured data.
+   */
+  siteFeatures: SiteFeatures
 }
 
 export interface ThingsToDoRef {
@@ -193,6 +249,10 @@ export interface GetPostParams {
 export interface ListPostsResponse {
   posts: PostListItem[]
   thingsToDoPages: ThingsToDoRef[]
+  /** On/off flags for each site-wide feature. Use to conditionally render UI elements. */
+  siteFeatures: SiteFeatures
+  /** Permalink structure (e.g. `/%slug%` or `/%year%/%month%/%slug%`). Each post already has a resolved `path`. */
+  permalinkStructure: string
   pagination: Pagination
 }
 
