@@ -187,6 +187,15 @@ export interface PostListItem {
   /** When true, include `nofollow` in the robots meta directive. */
   noFollow: boolean
   /**
+   * Primary SEO focus keyword for this post (e.g. `"roof repair austin"`).
+   * Inject into your `<head>` as needed — for example in Next.js:
+   * ```ts
+   * keywords: post.focusKeyword ? [post.focusKeyword] : undefined
+   * ```
+   * `null` when not set.
+   */
+  focusKeyword: string | null
+  /**
    * Estimated reading time in minutes (computed from word count at ~225 wpm).
    * Use this to render a "X min read" label. The dashboard `enableReadingTime`
    * feature flag controls whether to show it in your UI.
