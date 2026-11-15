@@ -1,5 +1,6 @@
 import type { HttpClient, ApiResponse } from "../http"
 import type { SiteSettingsResponse, RequestOptions } from "../types"
+import { cacheTags, withTags } from "../cache-tags"
 
 export class SiteSettingsResource {
   constructor(private http: HttpClient) {}
@@ -26,6 +27,7 @@ export class SiteSettingsResource {
       path: "/api/v1/content/site-settings",
       signal: options?.signal,
       revalidate: options?.revalidate,
+      tags: withTags([cacheTags.all, cacheTags.siteSettings], options?.tags),
     })
   }
 }

@@ -16,9 +16,10 @@ The official TypeScript SDK for the [NexoFlow](https://nexoflow.ai) Developer AP
 - **Zero dependencies** - nothing to audit, nothing to break.
 - **Full TypeScript support** - every response is typed, autocomplete works out of the box.
 - **Built-in retries & timeouts** - transient failures are handled automatically with exponential backoff.
-- **Async iterators** - paginate through thousands of posts with a simple `for await` loop.
+- **Async iterators** - paginate through thousands of posts with a simple `for await` loop; `all()` reads the pages in parallel.
+- **Structured data and llms.txt** - each page's JSON-LD and a ready `/llms.txt` route, from what NexoFlow knows about the business.
 - **Framework-agnostic** - works in Next.js, Nuxt, SvelteKit, Astro, Remix, Express, Fastify, Cloudflare Workers, Deno, Bun, and any server runtime.
-- **ISR-ready** - pass `revalidate` and the SDK sets the right cache headers for Next.js Incremental Static Regeneration.
+- **ISR-ready** - pass `revalidate` and the SDK's requests are served from the Next.js cache; cache tags let you refresh exactly what changed.
 
 ---
 
@@ -93,13 +94,13 @@ const nf = new NexoFlow({
 
   // Optional
   baseUrl: "https://nexoflow.net",  // default
-  timeout: 15_000,                   // 15 seconds (default)
+  timeout: 15_000,                   // 15 seconds per attempt (default)
   revalidate: 60,                    // Next.js ISR hint in seconds (default)
 
   // Custom fetch (useful for polyfills, edge runtimes, tests)
   fetch: customFetchFn,
 
-  // Retry transient failures (5xx, network errors)
+  // Retry transient failures (5xx, 429, network errors, timeouts). A cancel is never retried.
   retry: {
     attempts: 3, // default
     delay: 500,  // base delay in ms, doubles each retry (default)
@@ -125,10 +126,11 @@ const nf = new NexoFlow({
 | `apiKey`     | `string`           | *required*             | Your project API key (`pk_live_*`)                |
 | `baseUrl`    | `string`           | `https://nexoflow.net` | NexoFlow instance URL                             |
 | `revalidate` | `number \| false`  | `60`                   | Default ISR cache time (seconds) for Next.js      |
-| `timeout`    | `number`           | `15000`                | Request timeout (ms)                              |
+| `timeout`    | `number`           | `15000`                | Time each attempt gets (ms)                       |
 | `fetch`      | `typeof fetch`     | `globalThis.fetch`     | Custom fetch implementation                       |
 | `retry`      | `object`           | `{ attempts: 3, delay: 500 }` | Retry policy for transient failures       |
 | `debug`      | `boolean`          | `false`                | Log request/response details to console           |
+| `dedupe`     | `boolean`          | `false`                | Share one call between identical requests made at the same time. Not for Next.js (see Caching) |
 | `hooks`      | `object`           | `undefined`            | beforeRequest / afterResponse lifecycle hooks     |
 
 ---
@@ -155,6 +157,49 @@ console.log(data.posts)
 console.log(data.pagination)
 console.log(rateLimit?.remaining)
 ```
+
+---
+
+## Caching
+
+In Next.js every request carries your `revalidate` time, so pages are served from the Next.js data cache and the
+API is asked again at most once per `revalidate` window. Next.js already dedupes identical requests within one
+render, and each render's own request is what gives that render its cache tags and `revalidate` time, so leave
+`dedupe` off there. In runtimes with no deduplication of their own (Express, Fastify, Astro SSR, Workers),
+`dedupe: true` makes identical requests made at the same time share one call (each caller still gets its own
+objects; the hooks run once per shared call).
+
+Every request also carries cache tags, so a route of your own can refresh exactly what changed without waiting for
+the window. Protect it with a secret: anyone who can call it can empty your cache and send every visit to the API.
+
+```ts
+// app/api/refresh/route.ts (Next.js 16)
+import { revalidateTag } from "next/cache"
+import { cacheTags } from "nexoflow-sdk"
+
+export async function POST(request: Request) {
+  const secret = process.env.REFRESH_SECRET
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+    return new Response("Unauthorized", { status: 401 })
+  }
+  const body = await request.json().catch(() => ({}))
+  const slug = typeof body.slug === "string" ? body.slug : null
+  revalidateTag(slug ? cacheTags.post(slug) : cacheTags.posts, "max")
+  return Response.json({ ok: true })
+}
+```
+
+On Next.js 15 and earlier, `revalidateTag` takes the tag alone: `revalidateTag(cacheTags.posts)`.
+
+| Tag | Refreshes |
+|---|---|
+| `cacheTags.all` | everything read from NexoFlow |
+| `cacheTags.posts` | post lists and every post |
+| `cacheTags.post(slug)` | one post |
+| `cacheTags.thingsToDo` / `cacheTags.thingsToDoPage(slug)` | Things-to-Do lists, one page |
+| `cacheTags.siteSettings`, `cacheTags.structuredData`, `cacheTags.llmsTxt` | those reads |
+
+Add your own with the per-request `tags` option: `nf.posts.list({}, { tags: ["blog"] })`.
 
 ---
 
@@ -186,7 +231,7 @@ Both `PostListItem` (list responses) and `Post` (single-post response) include:
 Use them when configuring robots meta tags or framework metadata:
 
 ```ts
-// Next.js App Router — app/blog/[slug]/page.tsx
+// Next.js App Router - app/blog/[slug]/page.tsx
 import type { Metadata } from "next"
 import { NexoFlow } from "nexoflow-sdk"
 
@@ -218,6 +263,21 @@ for (const post of data.posts) {
 }
 ```
 
+### Categories, tags and the business's own fields
+
+Every post carries its categories (`categories`, `categoriesData`, the first is its main one), its tags (`tags`,
+`tagsData`) and `fields`: the fields the business added to its posts in NexoFlow ("Project cost", "Service area"),
+each with a `label` and a `text` ready to print. Print `fields` once and every field the business adds later shows on
+its own:
+
+```tsx
+{post.fields?.map((field) => (
+  <p key={field.key}>
+    <strong>{field.label}:</strong> {field.text}
+  </p>
+))}
+```
+
 ### Site feature flags & permalink structure
 
 Use `nf.siteSettings.get()` to read the project's global settings once at build time:
@@ -225,7 +285,7 @@ Use `nf.siteSettings.get()` to read the project's global settings once at build 
 ```ts
 const { data: siteSettings } = await nf.siteSettings.get()
 
-// permalinkStructure is informational — each post already exposes a resolved `path`
+// permalinkStructure is informational - each post already exposes a resolved `path`
 console.log(siteSettings.permalinkStructure) // e.g. "/%year%/%month%/%slug%"
 
 const {
@@ -271,10 +331,13 @@ The `enableSocialSharing` flag tells you whether to render share buttons. Build 
 
 #### JSON-LD schema markup
 
-When `enableSchemaMarkup` is `true`, inject a `BlogPosting` JSON-LD block in your page head (for example via your framework’s metadata or head API).
+Prefer `nf.structuredData.forPath(path)` (see [Structured data and llms.txt](#structured-data-and-llmstxt)): it gives
+every page, posts included, the markup NexoFlow builds from what it knows about the business. Where it returns
+nothing for a post and `enableSchemaMarkup` is `true`, inject a `BlogPosting` JSON-LD block in your page head (for
+example via your framework’s metadata or head API).
 
 ```ts
-// Next.js App Router — build jsonLd then pass to your head/layout helper
+// Next.js App Router - build jsonLd then pass to your head/layout helper
 if (post.siteFeatures.enableSchemaMarkup) {
   const jsonLd = {
     "@context": "https://schema.org",
@@ -297,7 +360,8 @@ if (post.siteFeatures.enableSchemaMarkup) {
 **Blog index with pagination:**
 
 ```ts
-const { data } = await nf.posts.list({ limit: 12, category: "engineering" })
+// `category` is the name exactly as a post lists it in `categories` (not the slug)
+const { data } = await nf.posts.list({ limit: 12, category: "Kitchen Remodeling" })
 
 for (const post of data.posts) {
   console.log(`${post.title} - ${post.excerpt}`)
@@ -308,7 +372,7 @@ if (data.pagination.hasMore) {
 }
 ```
 
-**Static site generation (get all slugs):**
+**Static site generation (get all slugs; the pages are read in parallel):**
 
 ```ts
 const slugs = await nf.posts.slugs()
@@ -318,7 +382,7 @@ const slugs = await nf.posts.slugs()
 **Async iterator - process every post without manual pagination:**
 
 ```ts
-for await (const post of nf.posts.iter({ category: "news" })) {
+for await (const post of nf.posts.iter({ category: "Kitchen Remodeling" })) {
   console.log(post.title)
 }
 ```
@@ -378,6 +442,50 @@ Each attraction includes:
 
 ---
 
+## Structured data and llms.txt
+
+**Each page's JSON-LD.** Call it for every page with that page's path, and print nothing when `jsonld` is `null`.
+In React, render a `<script type="application/ld+json">` with `jsonLdText` (escaped, safe to inject). A script is
+valid in `<head>` or `<body>`; never wrap it in a `<div>`, which is not allowed in `<head>` and pushes every tag
+after it into the body. On a page where it returns markup, do not add your own `BlogPosting` JSON-LD, so the page
+is not described twice.
+
+```tsx
+// components/page-schema.tsx - render it from each page (or the layout) with the page's path
+import { jsonLdText } from "nexoflow-sdk"
+
+export async function PageSchema({ path }: { path: string }) {
+  const { data } = await nf.structuredData.forPath(path)
+  if (!data.jsonld) return null
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdText(data.jsonld) }} />
+}
+```
+
+Where pages are built from strings (Astro `set:html`, Nuxt, plain HTML templates), print `data.scriptTag` as it
+is: it is the whole `<script>` element, already escaped. A full address works too, and the query and fragment are
+left out either way (`forPath("https://yoursite.com/about?ref=x")` and `forPath("about#team")` both read `/about`).
+
+**llms.txt.** What the business is, how to reach it, its services, the places it serves and its key pages, for AI
+assistants. Mount the ready route and remove any static `llms.txt`:
+
+```ts
+// app/llms.txt/route.ts (Next.js App Router)
+import { NexoFlow } from "nexoflow-sdk"
+
+const nf = new NexoFlow({ apiKey: process.env.NEXOFLOW_API_KEY!, revalidate: 3600 })
+export const GET = nf.llmsTxt.handler() // plain text
+```
+
+It answers 404 only when NexoFlow itself says the business has no llms.txt (its 404 says
+`X-NexoFlow-Reason: no-llms-txt`). Anything else that is not the file (an outage, a timeout, a revoked or rotated
+key, any other 404 from a wrong `baseUrl` or a proxy, an empty answer) gets a
+503 with `Cache-Control: no-store`, so no CDN or crawler remembers "there is no file" for a problem that is
+temporary, and the reason goes to your logs. The handler returns a web `Response`, so it
+also works in Remix, SvelteKit, Astro, Hono and Workers. To read the text yourself:
+`const { data: text } = await nf.llmsTxt.get()` (`null` when there is none).
+
+---
+
 ## Error Handling
 
 ```ts
@@ -397,6 +505,17 @@ try {
   }
 }
 ```
+
+| `code` | When | Retried |
+|---|---|---|
+| the API's own, or `HTTP_<status>` | the API answered with an error | 5xx and 429 |
+| `TIMEOUT` | every attempt ran out of time (`timeout` is per attempt) | yes |
+| `NETWORK_ERROR` | the API could not be reached | yes |
+| `ABORTED` | you cancelled it with your own `signal` (`err.isAborted`) | never |
+| `INVALID_RESPONSE` | a success status whose body is not JSON: a wrong `baseUrl`, or a proxy answering (`err.isInvalidResponse`) | never |
+
+A 429 that asks to wait 5 seconds or less is waited out. A longer one fails at once with `err.retryAfterMs`, so a
+page never hangs; schedule your own retry from it.
 
 ---
 
@@ -423,7 +542,12 @@ export default async function BlogPage() {
       {data.posts.map((post) => (
         <article key={post.slug}>
           {post.featuredImageUrl && (
-            <img src={post.featuredImageUrl} alt={post.title} />
+            <img
+              src={post.featuredImageUrl}
+              alt={post.featuredImageAlt ?? post.title}
+              width={post.featuredImageWidth ?? undefined}
+              height={post.featuredImageHeight ?? undefined}
+            />
           )}
           <a href={`/blog/${post.slug}`}><h2>{post.title}</h2></a>
           <p>{post.excerpt}</p>
@@ -624,6 +748,26 @@ import type {
 ```
 
 ---
+
+## Changelog
+
+### 0.5.0
+
+- **Faster in Next.js.** Requests no longer carry a per-call request id. Next.js keys its data cache on the request
+  headers, so that id meant the cache never answered and every render called the API. `ApiResponse.traceId` stays,
+  for your own logs only.
+- **Retries and cancels behave.** `timeout` is per attempt, so a retry after a slow attempt gets its full time. A
+  cancel through your own `signal` is one call and an `ABORTED` error, never retried. A hook that throws fails the
+  call with its own error, once. A 429 asking to wait more than 5 s fails at once with `retryAfterMs`. A success
+  whose body is not JSON is `INVALID_RESPONSE`, not retried.
+- **Cache tags** on every request (`cacheTags`, plus your own with `tags`).
+- **`all()` and `slugs()` read pages 4 at a time**; `iter()` reads the next page ahead.
+- **New:** `structuredData.forPath`, `jsonLdText`, `llmsTxt.get` and `llmsTxt.handler`, the `dedupe` option, and the
+  `FaqItem` type export.
+- **Breaking (types):** `PostListItem.focusKeyword` is optional. Lists never sent it, so it was always `undefined`
+  there; a single post (`posts.get`) still always has it. Code that assigns a list item's `focusKeyword` to
+  `string | null` needs `?? null`.
+- **Breaking (behaviour):** `isNetworkError` is `false` for a cancel (use `isAborted`).
 
 ## Requirements
 

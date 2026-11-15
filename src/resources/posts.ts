@@ -7,6 +7,8 @@ import type {
   PostListItem,
   RequestOptions,
 } from "../types"
+import { cacheTags, withTags } from "../cache-tags"
+import { PAGE_SIZE_MAX, iteratePages, readAllPages } from "../paging"
 
 export class PostsResource {
   constructor(private http: HttpClient) {}
@@ -34,6 +36,7 @@ export class PostsResource {
       },
       signal: options?.signal,
       revalidate: options?.revalidate,
+      tags: withTags([cacheTags.all, cacheTags.posts], options?.tags),
     })
   }
 
@@ -60,14 +63,15 @@ export class PostsResource {
       },
       signal: options?.signal,
       revalidate: options?.revalidate,
+      tags: withTags([cacheTags.all, cacheTags.posts, cacheTags.post(slug)], options?.tags),
     })
   }
 
   /**
-   * Fetch **all** posts across every page. Useful for static site generation.
+   * Fetch **all** posts across every page. Useful for static site generation and sitemaps.
    *
-   * Automatically paginates through all available data. To cancel
-   * a long-running fetch, pass an `AbortSignal` via options.
+   * Reads the first page, then the rest a few at a time in parallel. To cancel a long-running fetch, pass an
+   * `AbortSignal` via options.
    *
    * ```ts
    * const allPosts = await nf.posts.all()
@@ -77,19 +81,13 @@ export class PostsResource {
     params?: Omit<ListPostsParams, "page">,
     options?: RequestOptions,
   ): Promise<PostListItem[]> {
-    const allPosts: PostListItem[] = []
-    let page = 1
-    let hasMore = true
-
-    while (hasMore) {
-      const { data } = await this.list({ ...params, page, limit: 100 }, options)
-      if (data.posts.length === 0) break
-      allPosts.push(...data.posts)
-      hasMore = data.pagination.hasMore
-      page++
-    }
-
-    return allPosts
+    return readAllPages(
+      async (page) => {
+        const { data } = await this.list({ ...params, page, limit: PAGE_SIZE_MAX }, options)
+        return { items: data.posts, pagination: data.pagination }
+      },
+      (post) => post.slug,
+    )
   }
 
   /**
@@ -107,29 +105,22 @@ export class PostsResource {
   }
 
   /**
-   * Async iterator that yields one post-list item at a time across all pages.
+   * Async iterator that yields one post-list item at a time across all pages. The next page is already being
+   * read while you use the current one, so a loop that stops early costs one extra call.
    *
    * ```ts
-   * for await (const post of nf.posts.iter({ category: "news" })) {
+   * for await (const post of nf.posts.iter({ category: "Kitchen Remodeling" })) {
    *   console.log(post.title)
    * }
    * ```
    */
-  async *iter(
+  iter(
     params?: Omit<ListPostsParams, "page">,
     options?: RequestOptions,
   ): AsyncGenerator<PostListItem, void, undefined> {
-    let page = 1
-    let hasMore = true
-
-    while (hasMore) {
-      const { data } = await this.list({ ...params, page, limit: 100 }, options)
-      if (data.posts.length === 0) break
-      for (const post of data.posts) {
-        yield post
-      }
-      hasMore = data.pagination.hasMore
-      page++
-    }
+    return iteratePages(async (page) => {
+      const { data } = await this.list({ ...params, page, limit: PAGE_SIZE_MAX }, options)
+      return { items: data.posts, pagination: data.pagination }
+    })
   }
 }

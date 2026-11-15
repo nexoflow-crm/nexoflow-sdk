@@ -1,8 +1,11 @@
 export { NexoFlow } from "./client"
 export { NexoFlowError } from "./errors"
 export { VERSION } from "./version"
+export { cacheTags } from "./cache-tags"
+export { jsonLdText } from "./json-ld"
 
 export type {
+  PostField,
   NexoFlowConfig,
   RequestOptions,
   Pagination,
@@ -15,6 +18,8 @@ export type {
   SiteSettingsResponse,
   PostListItem,
   Post,
+  FaqItem,
+  StructuredDataResponse,
   ThingsToDoRef,
   ListPostsParams,
   GetPostParams,
@@ -30,3 +35,4 @@ export type {
 } from "./types"
 
 export type { ApiResponse } from "./http"
+export type { LlmsTxtHandlerOptions } from "./resources/llms-txt"

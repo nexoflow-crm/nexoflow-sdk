@@ -7,6 +7,8 @@ import type {
   ThingsToDoListItem,
   RequestOptions,
 } from "../types"
+import { cacheTags, withTags } from "../cache-tags"
+import { PAGE_SIZE_MAX, iteratePages, readAllPages } from "../paging"
 
 export class ThingsToDoResource {
   constructor(private http: HttpClient) {}
@@ -33,6 +35,7 @@ export class ThingsToDoResource {
       },
       signal: options?.signal,
       revalidate: options?.revalidate,
+      tags: withTags([cacheTags.all, cacheTags.thingsToDo], options?.tags),
     })
   }
 
@@ -60,30 +63,25 @@ export class ThingsToDoResource {
       },
       signal: options?.signal,
       revalidate: options?.revalidate,
+      tags: withTags([cacheTags.all, cacheTags.thingsToDo, cacheTags.thingsToDoPage(slug)], options?.tags),
     })
   }
 
   /**
-   * Fetch **all** Things-to-Do pages across every page.
+   * Fetch **all** Things-to-Do pages across every page, a few pages at a time in parallel.
    * To cancel a long-running fetch, pass an `AbortSignal` via options.
    */
   async all(
     params?: Omit<ListThingsToDoParams, "page">,
     options?: RequestOptions,
   ): Promise<ThingsToDoListItem[]> {
-    const allPages: ThingsToDoListItem[] = []
-    let page = 1
-    let hasMore = true
-
-    while (hasMore) {
-      const { data } = await this.list({ ...params, page, limit: 100 }, options)
-      if (data.pages.length === 0) break
-      allPages.push(...data.pages)
-      hasMore = data.pagination.hasMore
-      page++
-    }
-
-    return allPages
+    return readAllPages(
+      async (page) => {
+        const { data } = await this.list({ ...params, page, limit: PAGE_SIZE_MAX }, options)
+        return { items: data.pages, pagination: data.pagination }
+      },
+      (item) => item.slug,
+    )
   }
 
   /**
@@ -95,7 +93,8 @@ export class ThingsToDoResource {
   }
 
   /**
-   * Async iterator that yields one page at a time across all pages.
+   * Async iterator that yields one page at a time across all pages; the next list page is read ahead, so a loop
+   * that stops early costs one extra call.
    *
    * ```ts
    * for await (const page of nf.thingsToDo.iter()) {
@@ -103,21 +102,13 @@ export class ThingsToDoResource {
    * }
    * ```
    */
-  async *iter(
+  iter(
     params?: Omit<ListThingsToDoParams, "page">,
     options?: RequestOptions,
   ): AsyncGenerator<ThingsToDoListItem, void, undefined> {
-    let page = 1
-    let hasMore = true
-
-    while (hasMore) {
-      const { data } = await this.list({ ...params, page, limit: 100 }, options)
-      if (data.pages.length === 0) break
-      for (const item of data.pages) {
-        yield item
-      }
-      hasMore = data.pagination.hasMore
-      page++
-    }
+    return iteratePages(async (page) => {
+      const { data } = await this.list({ ...params, page, limit: PAGE_SIZE_MAX }, options)
+      return { items: data.pages, pagination: data.pagination }
+    })
   }
 }

@@ -3,6 +3,8 @@ import { createHttpClient } from "./http"
 import { PostsResource } from "./resources/posts"
 import { ThingsToDoResource } from "./resources/things-to-do"
 import { SiteSettingsResource } from "./resources/site-settings"
+import { StructuredDataResource } from "./resources/structured-data"
+import { LlmsTxtResource } from "./resources/llms-txt"
 import { VERSION } from "./version"
 
 const API_KEY_PREFIX = "pk_live_"
@@ -30,6 +32,10 @@ export class NexoFlow {
   readonly thingsToDo: ThingsToDoResource
   /** Site settings resource - permalink structure and feature flags. */
   readonly siteSettings: SiteSettingsResource
+  /** Structured data - the JSON-LD each page of the site should carry. */
+  readonly structuredData: StructuredDataResource
+  /** llms.txt - the site's file for AI assistants, and a ready `/llms.txt` route. */
+  readonly llmsTxt: LlmsTxtResource
   /** SDK version string. */
   static readonly version: string = VERSION
 
@@ -86,5 +92,7 @@ export class NexoFlow {
     this.posts = new PostsResource(http)
     this.thingsToDo = new ThingsToDoResource(http)
     this.siteSettings = new SiteSettingsResource(http)
+    this.structuredData = new StructuredDataResource(http)
+    this.llmsTxt = new LlmsTxtResource(http)
   }
 }

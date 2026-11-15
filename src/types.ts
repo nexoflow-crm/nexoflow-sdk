@@ -20,7 +20,10 @@ export interface NexoFlowConfig {
   /** Default `next.revalidate` hint (seconds) for Next.js ISR caching. Defaults to `60`. */
   revalidate?: number | false
 
-  /** Request timeout in milliseconds. Defaults to `15_000` (15 s). */
+  /**
+   * Time each attempt gets, in milliseconds. Defaults to `15_000` (15 s). A retry after a slow attempt gets the full
+   * time again.
+   */
   timeout?: number
 
   /**
@@ -29,7 +32,10 @@ export interface NexoFlowConfig {
    */
   fetch?: typeof globalThis.fetch
 
-  /** Automatic retry policy for transient failures (network errors & 5xx). */
+  /**
+   * Automatic retry policy for transient failures (network errors, timeouts, 5xx and 429). A cancel through your own
+   * `signal` is never retried. A 429 asking to wait longer than 5 s fails at once with `retryAfterMs` on the error.
+   */
   retry?: {
     /** Maximum number of attempts (including the initial request). Defaults to `3`. */
     attempts?: number
@@ -43,11 +49,24 @@ export interface NexoFlowConfig {
    */
   debug?: boolean
 
+  /**
+   * Share one call between identical requests made at the same time. Default `false`.
+   *
+   * Turn it on only where nothing else dedupes requests (Express, Fastify, Astro SSR, Workers). Leave it off in
+   * Next.js: there each render has to make its own fetch, because that call is what gives the render its cache tags
+   * and `revalidate` time, and Next already dedupes identical fetches within one render. With it on, the hooks run
+   * once per shared call.
+   */
+  dedupe?: boolean
+
   /** Optional hooks for request/response inspection or mutation. */
   hooks?: {
-    /** Called just before each fetch. You may mutate `req`. */
+    /** Called just before each attempt's fetch. You may mutate `req`. */
     beforeRequest?: (req: { url: string; init: RequestInit }) => void | Promise<void>
-    /** Called after each successful or error response. */
+    /**
+     * Called after each successful or error response, with a copy of it (reading its body is safe). An error it
+     * throws fails the call with that error as it is, once: it is not retried and not reported as a network error.
+     */
     afterResponse?: (res: Response) => void | Promise<void>
   }
 }
@@ -55,10 +74,15 @@ export interface NexoFlowConfig {
 // ── Request Options (per-call overrides) ────────────────────────────────────
 
 export interface RequestOptions {
-  /** Per-request AbortSignal for cancellation (composed with the global timeout). */
+  /**
+   * Per-request AbortSignal for cancellation (composed with each attempt's timeout). A cancelled request fails with
+   * code `ABORTED` and is not retried.
+   */
   signal?: AbortSignal
   /** Override the default ISR revalidate hint for this request only. */
   revalidate?: number | false
+  /** Extra Next.js cache tags for this request, on top of the SDK's own (see `cacheTags`). */
+  tags?: string[]
 }
 
 // ── Pagination ──────────────────────────────────────────────────────────────
@@ -94,6 +118,28 @@ export interface Tag {
   id: string
   slug: string
   name: string
+}
+
+/**
+ * A field the business added to its posts in NexoFlow ("Project cost", "Service area"). Every field it sends to its
+ * site that has a value on the post, in the business's order. Print the list once, and every field the business
+ * adds later shows on its own, with no new release:
+ *
+ * ```tsx
+ * {post.fields?.map((field) => (
+ *   <p key={field.key}><strong>{field.label}:</strong> {field.text}</p>
+ * ))}
+ * ```
+ */
+export interface PostField {
+  /** Stable name, never changes ("project_cost"). */
+  key: string
+  label: string
+  type: "text" | "long_text" | "number" | "date" | "yes_no" | "choice" | "list" | "link"
+  /** As stored: text, a number, yes or no, a day (`YYYY-MM-DD`), or a list of names. */
+  value: string | number | boolean | string[] | null
+  /** The value ready to print ("Yes", "Nov 13, 2026", "Kitchen, Bath"). */
+  text: string
 }
 
 export interface Author {
@@ -169,6 +215,15 @@ export interface PostListItem {
   author: string | null
   featuredImage: string | null
   featuredImageUrl: string | null
+  /**
+   * The featured image's real width and height in pixels, for `<img width height>` and
+   * `og:image:width` / `og:image:height`. `null` when not known yet (the single-post
+   * endpoint reads and keeps them; a list carries them once they are kept).
+   */
+  featuredImageWidth?: number | null
+  featuredImageHeight?: number | null
+  /** What the featured image shows, for its `alt`. `null` when no description is known. */
+  featuredImageAlt?: string | null
   publishedAt: string | null
   createdAt: string
   updatedAt: string
@@ -187,14 +242,14 @@ export interface PostListItem {
   /** When true, include `nofollow` in the robots meta directive. */
   noFollow: boolean
   /**
-   * Primary SEO focus keyword for this post (e.g. `"roof repair austin"`).
-   * Inject into your `<head>` as needed — for example in Next.js:
+   * Primary SEO focus keyword for this post (e.g. `"roof repair austin"`). Sent with a single post
+   * (`posts.get`), not in lists. Inject into your `<head>` as needed - for example in Next.js:
    * ```ts
    * keywords: post.focusKeyword ? [post.focusKeyword] : undefined
    * ```
    * `null` when not set.
    */
-  focusKeyword: string | null
+  focusKeyword?: string | null
   /**
    * Estimated reading time in minutes (computed from word count at ~225 wpm).
    * Use this to render a "X min read" label. The dashboard `enableReadingTime`
@@ -207,9 +262,16 @@ export interface PostListItem {
    * Ready to use as an `href` in your link components.
    */
   path: string
+  /**
+   * The business's own post fields with a value on this post (see {@link PostField}). Empty when it has none;
+   * absent from servers older than this field.
+   */
+  fields?: PostField[]
 }
 
 export interface Post extends PostListItem {
+  /** Primary SEO focus keyword for this post. `null` when not set. */
+  focusKeyword: string | null
   /** Full post body - HTML (default) or raw markdown depending on `format`. */
   content: string
   /** CSS styles for the post content. Inject into your page for proper styling. */
@@ -227,6 +289,31 @@ export interface Post extends PostListItem {
    * social sharing buttons, and JSON-LD structured data.
    */
   siteFeatures: SiteFeatures
+  /**
+   * "People Also Ask" / FAQ items for this post. Empty when the post has no FAQ
+   * section (the feature is opt-in per project in Content Rules).
+   *
+   * When `format: "html"`, the FAQ is also rendered inline in `content` as a
+   * styled `<section class="nexoflow-faq">` accordion, and its CSS is included in
+   * `contentStyles`. Use this structured array to emit FAQPage JSON-LD when
+   * `siteFeatures.enableSchemaMarkup` is `true`:
+   *
+   * ```ts
+   * if (post.siteFeatures.enableSchemaMarkup && post.faq.length) {
+   *   const jsonLd = {
+   *     "@context": "https://schema.org",
+   *     "@type": "FAQPage",
+   *     mainEntity: post.faq.map((f) => ({
+   *       "@type": "Question",
+   *       name: f.question,
+   *       acceptedAnswer: { "@type": "Answer", text: f.answer },
+   *     })),
+   *   }
+   *   // <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
+   * }
+   * ```
+   */
+  faq: FaqItem[]
 }
 
 export interface ThingsToDoRef {
@@ -236,12 +323,26 @@ export interface ThingsToDoRef {
   state: string | null
 }
 
+/**
+ * A single "People Also Ask" / FAQ entry for a post. Populated on the
+ * single-post endpoint only (empty array when the post has no FAQ section).
+ */
+export interface FaqItem {
+  /** Reader-facing question, phrased the way people search. */
+  question: string
+  /** Concise answer (typically 2 to 4 sentences). */
+  answer: string
+}
+
 // ── Posts API params ────────────────────────────────────────────────────────
 
 export interface ListPostsParams {
   page?: number
+  /** Posts per page, 1 to 100. Default 20. */
   limit?: number
+  /** Only posts with this tag, written exactly as a post lists it in `tags`. */
   tag?: string
+  /** Only posts in this category, written exactly as a post lists it in `categories` (the name, not the slug). */
   category?: string
   sort?: "newest" | "oldest"
 }
@@ -265,7 +366,17 @@ export interface ListPostsResponse {
   pagination: Pagination
 }
 
-export interface GetPostResponse extends Post {}
+export type GetPostResponse = Post
+
+// ── Structured data ─────────────────────────────────────────────────────────
+
+/** Response from `GET /api/v1/content/structured-data?path=…` (`nf.structuredData.forPath`). */
+export interface StructuredDataResponse {
+  /** The page's JSON-LD, or `null` when there is none for it or schema markup is switched off. */
+  jsonld: Record<string, unknown> | null
+  /** The same JSON-LD as a ready, escaped `<script type="application/ld+json">` tag. Present when `jsonld` is. */
+  scriptTag?: string
+}
 
 // ── Things to Do ────────────────────────────────────────────────────────────
 
